@@ -2,11 +2,11 @@ import os
 import json
 import time
 from openai import OpenAI
-
+from opentelemetry import trace
 from datetime import datetime
 from prompts.hippa_compliance_prompts import system_prompt_v2
 # Acquire a tracer
-#tracer = trace.get_tracer("generate_audit.tracer")
+tracer = trace.get_tracer("generate_audit.tracer")
 
 def generate_audit(
     transcript: str,
@@ -20,112 +20,64 @@ def generate_audit(
         api_key="dummy",
     )
 
-    
-    start_time = time.time()
-    completion = client.chat.completions.create(
-        model=model_name,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": transcript},
-        ],
-        temperature=temperature,
-    )
-    elapsed = time.time() - start_time
+    with tracer.start_as_current_span("AuditGeneration") as span:
+        span.set_attribute("model_name", model_name)
+        span.set_attribute("operation", "audit_generation")
+        span.set_attribute("prompt", prompt)
+        span.set_attribute("transcript", transcript)
+        span.set_attribute("temperature", temperature)
 
-    response = completion.choices[0].message.content.strip()
-    usage = getattr(completion, "usage", None)
-    
-    # Optionally log the trace info as before
-    audit_trace = {
-        "input": transcript,
-        "response": response,
-        "latency_seconds": elapsed,
-        "prompt_tokens": getattr(usage, 'prompt_tokens', None),
-        "completion_tokens": getattr(usage, 'completion_tokens', None),
-        "total_tokens": getattr(usage, 'total_tokens', None),
-        "model_name": model_name,
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "operation": "audit_generation",
-    }
+        start_time = time.time()
+        completion = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": transcript},
+            ],
+            temperature=temperature,
+        )
+        elapsed = time.time() - start_time
 
-    # Get parent of current working directory
-    parent_dir = os.path.dirname(os.getcwd())
+        response = completion.choices[0].message.content.strip()
+        usage = getattr(completion, "usage", None)
 
-    # Full path for traces directory inside the parent directory
-    trace_dir = os.path.join(parent_dir, "observability", "traces")
+        if usage:
+            span.set_attribute("prompt_tokens", usage.prompt_tokens)
+            span.set_attribute("completion_tokens", usage.completion_tokens)
+            span.set_attribute("total_tokens", usage.total_tokens)
 
-    # Make the directory if it doesn't exist
-    os.makedirs(trace_dir, exist_ok=True)
+        span.set_attribute("latency_seconds", elapsed)
+        span.set_attribute("response", response)
 
-    # Use full path when saving the file (join with trace_dir)
-    filename = f"audit_generation_{datetime.now().isoformat()}.json"
-    save_path = os.path.join(trace_dir, filename)
-    
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(audit_trace, f, indent=2, ensure_ascii=False)
+        # Optionally log the trace info as before
+        audit_trace = {
+            "input": transcript,
+            "response": response,
+            "latency_seconds": elapsed,
+            "prompt_tokens": getattr(usage, 'prompt_tokens', None),
+            "completion_tokens": getattr(usage, 'completion_tokens', None),
+            "total_tokens": getattr(usage, 'total_tokens', None),
+            "model_name": model_name,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "operation": "audit_generation",
+        }
 
-    print(f"Predictions saved to {save_path}")
+        # Get parent of current working directory
+        parent_dir = os.path.dirname(os.getcwd())
 
-    return response
+        # Full path for traces directory inside the parent directory
+        trace_dir = os.path.join(parent_dir, "observability", "traces")
 
-    # with tracer.start_as_current_span("AuditGeneration") as span:
-    #     span.set_attribute("model_name", model_name)
-    #     span.set_attribute("operation", "audit_generation")
-    #     span.set_attribute("prompt", prompt)
-    #     span.set_attribute("transcript", transcript)
-    #     span.set_attribute("temperature", temperature)
+        # Make the directory if it doesn't exist
+        os.makedirs(trace_dir, exist_ok=True)
 
-    #     start_time = time.time()
-    #     completion = client.chat.completions.create(
-    #         model=model_name,
-    #         messages=[
-    #             {"role": "system", "content": prompt},
-    #             {"role": "user", "content": transcript},
-    #         ],
-    #         temperature=temperature,
-    #     )
-    #     elapsed = time.time() - start_time
-
-    #     response = completion.choices[0].message.content.strip()
-    #     usage = getattr(completion, "usage", None)
-
-    #     if usage:
-    #         span.set_attribute("prompt_tokens", usage.prompt_tokens)
-    #         span.set_attribute("completion_tokens", usage.completion_tokens)
-    #         span.set_attribute("total_tokens", usage.total_tokens)
-
-    #     span.set_attribute("latency_seconds", elapsed)
-    #     span.set_attribute("response", response)
-
-    #     # Optionally log the trace info as before
-    #     audit_trace = {
-    #         "input": transcript,
-    #         "response": response,
-    #         "latency_seconds": elapsed,
-    #         "prompt_tokens": getattr(usage, 'prompt_tokens', None),
-    #         "completion_tokens": getattr(usage, 'completion_tokens', None),
-    #         "total_tokens": getattr(usage, 'total_tokens', None),
-    #         "model_name": model_name,
-    #         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    #         "operation": "audit_generation",
-    #     }
-
-    #     # Get parent of current working directory
-    #     parent_dir = os.path.dirname(os.getcwd())
-
-    #     # Full path for traces directory inside the parent directory
-    #     trace_dir = os.path.join(parent_dir, "observability", "traces")
-
-    #     # Make the directory if it doesn't exist
-    #     os.makedirs(trace_dir, exist_ok=True)
-
-    #     # Use full path when saving the file (join with trace_dir)
-    #     filename = f"audit_generation_{datetime.now().isoformat()}.json"
-    #     save_path = os.path.join(trace_dir, filename)
+        # Use full path when saving the file (join with trace_dir)
+        filename = f"audit_generation_{datetime.now().isoformat()}.json"
+        save_path = os.path.join(trace_dir, filename)
         
-    #     with open(save_path, "w", encoding="utf-8") as f:
-    #         json.dump(audit_trace, f, indent=2, ensure_ascii=False)
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(audit_trace, f, indent=2, ensure_ascii=False)
 
-    #     print(f"Predictions saved to {save_path}")
+        print(f"Predictions saved to {save_path}")
 
-    #     return response
+        return response
