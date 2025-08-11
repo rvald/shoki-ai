@@ -28,6 +28,10 @@ jobs:
             source .venv/bin/activate
             uv sync --locked --all-extras --dev
 
+  
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
+
       - name: Run tests
         run: |
             source .venv/bin/activate
