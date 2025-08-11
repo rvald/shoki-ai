@@ -1,0 +1,60 @@
+from fastapi.testclient import TestClient
+from backend.compliance.main import app
+
+client = TestClient(app)
+
+def test_audit_request(monkeypatch):
+    # Fake implementation to avoid real work
+    def fake_generate_audit(transcript, model_name="deepseek-r1:7b"):
+        fake_generate_audit.called_with = {
+            "transcript": transcript,
+            "model_name": model_name,
+        }
+        return "mocked-audit"
+
+    # Patch the dependency used by the endpoint
+    monkeypatch.setattr("backend.compliance.audit_generation.generate_audit", fake_generate_audit)
+
+    resp = client.post(
+        "/api/v1/audit",
+        json={"transcript": "This is a test transcript for compliance audit."}
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"audit": "mocked-audit"}
+    # verify what was passed to generate_audit
+    assert fake_generate_audit.called_with["transcript"] == "This is a test transcript for compliance audit."
+    assert fake_generate_audit.called_with["model_name"] == "deepseek-r1:7b"
+
+def test_audit_missing_field():
+    resp = client.post("/api/v1/audit", json={})
+    assert resp.status_code == 422
+    data = resp.json()
+    assert "detail" in data
+
+def test_audit_null_transcript():
+    resp = client.post("/api/v1/audit", json={"transcript": None})
+    assert resp.status_code == 422
+
+def test_audit_wrong_type():
+    resp = client.post("/api/v1/audit", json={"transcript": 123})
+    assert resp.status_code == 422
+
+def test_audit_empty_string():
+    resp = client.post("/api/v1/audit", json={"transcript": ""})
+    assert resp.status_code == 422
+
+def test_audit_extra_fields_ignored(monkeypatch):
+    def fake_generate_audit(transcript, model_name="deepseek-r1:7b"):
+        return "mocked-audit"
+
+    monkeypatch.setattr("backend.compliance.audit_generation.generate_audit", fake_generate_audit)
+
+    resp = client.post("/api/v1/audit", json={"transcript": "ok", "foo": "bar"})
+
+    assert resp.status_code == 200
+    assert resp.json() == {"audit": "mocked-audit"}
+
+def test_audit_method_not_allowed():
+    resp = client.get("/api/v1/audit")
+    assert resp.status_code == 405
