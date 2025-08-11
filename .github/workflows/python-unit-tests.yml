@@ -27,13 +27,11 @@ jobs:
             uv venv .venv
             source .venv/bin/activate
             uv sync --locked --all-extras --dev
+      
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
       - name: Run tests
-        working-directory: 
-            ${{ github.workspace }} 
-        env: 
-            PYTHONPATH: 
-                ${{ github.workspace }}
         run: |
             source .venv/bin/activate
             uv run pytest tests
