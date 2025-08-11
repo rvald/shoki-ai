@@ -26,8 +26,6 @@ jobs:
         run: |
             uv venv .venv
             source .venv/bin/activate
-            uv pip install opentelemetry-distro opentelemetry-exporter-otlp
-            uv run opentelemetry-bootstrap -a requirements | uv pip install --requirement -
             uv sync --locked --all-extras --dev
 
   
