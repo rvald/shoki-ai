@@ -27,8 +27,8 @@ jobs:
             uv venv .venv
             source .venv/bin/activate
             uv pip install opentelemetry-distro opentelemetry-exporter-otlp
-            uv sync --locked --all-extras --dev
             uv run opentelemetry-bootstrap -a requirements | uv pip install --requirement -
+            uv sync --locked --all-extras --dev
 
   
       - name: Set PYTHONPATH
