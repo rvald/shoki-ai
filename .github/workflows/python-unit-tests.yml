@@ -34,5 +34,5 @@ jobs:
       - name: Run tests
         run: |
             source .venv/bin/activate
-            uv run pytest tests
+            uv run pytest --import-mode=importlib
             
