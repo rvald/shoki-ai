@@ -1,6 +1,6 @@
 from fastapi import FastAPI, APIRouter
 from pydantic import BaseModel, Field
-from . import audit_generation
+from audit_generation import generate_audit
 
 router = APIRouter()
 
@@ -17,7 +17,7 @@ class ComplianceResponse(BaseModel):
     description="Return the provided transcript for compliance auditing."
 )
 async def audit_request(payload: ComplianceRequest) -> ComplianceResponse:
-    response = audit_generation.generate_audit(
+    response = generate_audit(
         transcript=payload.transcript,
         model_name="deepseek-r1:7b"
     )
