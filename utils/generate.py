@@ -9,8 +9,6 @@ def generate_response(
     model_name: str,
     experiment_name: str = "default_generation",
     temperature: float = 0.4,
-    
-    
 ) -> list[str]:
     """
     Generates predictions, token usage, and latency, and saves them to experiments/predictions/{experiment_name}.json.
@@ -19,7 +17,7 @@ def generate_response(
     predictions = []
 
     client = OpenAI(
-        base_url="http://localhost:11434/v1",  # Adjust as needed
+        base_url="http://localhost:11434/v1",  
         api_key="dummy",
     )
 

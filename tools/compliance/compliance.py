@@ -1,10 +1,9 @@
 import requests
 import json
-import os
 
 
 def create_audit(
-        transcript: str
+    transcript: str
 ) -> dict:
     """
     Create a compliance audit for the given transcript.
