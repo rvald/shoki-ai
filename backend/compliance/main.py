@@ -19,7 +19,7 @@ class ComplianceResponse(BaseModel):
 async def audit_request(payload: ComplianceRequest) -> ComplianceResponse:
     response = audit_generation.generate_audit(
         transcript=payload.transcript,
-        model_name="deepseek-r1:7b"
+        model_name="gpt-oss"
     )
     return ComplianceResponse(audit=response)
 

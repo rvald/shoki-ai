@@ -8,6 +8,7 @@ from prompts.hippa_compliance_prompts import system_prompt_v2
 # Acquire a tracer
 tracer = trace.get_tracer("generate_audit.tracer")
 
+
 def generate_audit(
     transcript: str,
     model_name: str,
@@ -15,8 +16,10 @@ def generate_audit(
     temperature: float = 0.4,
 ) -> str:
     
+    BASE_URL = os.environ.get("OLLAMA_GCS_URL")
+    
     client = OpenAI(
-        base_url="http://localhost:11434/v1",
+        base_url = f"{BASE_URL}/v1",
         api_key="dummy",
     )
 
