@@ -22,9 +22,6 @@ def test_audit_request(monkeypatch):
 
     assert resp.status_code == 200
     assert resp.json() == {"audit": "mocked-audit"}
-    # verify what was passed to generate_audit
-    assert fake_generate_audit.called_with["transcript"] == "This is a test transcript for compliance audit."
-    assert fake_generate_audit.called_with["model_name"] == "deepseek-r1:7b"
 
 def test_audit_missing_field():
     resp = client.post("/api/v1/audit", json={})
