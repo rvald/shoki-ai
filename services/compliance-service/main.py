@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .routers import audit
+from .src.routers import audit
 
 app = FastAPI(title="Compliance API", version="1.0.0")
 app.include_router(audit.router, prefix="/api/v1")
