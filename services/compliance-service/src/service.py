@@ -4,7 +4,7 @@ import time
 from openai import OpenAI
 from opentelemetry import trace
 from datetime import datetime
-from prompts.hippa_compliance_prompts import system_prompt_v2
+from .prompt import system_prompt
 # Acquire a tracer
 tracer = trace.get_tracer("generate_audit.tracer")
 
@@ -12,7 +12,7 @@ tracer = trace.get_tracer("generate_audit.tracer")
 def generate_audit(
     transcript: str,
     model_name: str,
-    prompt: str = system_prompt_v2,
+    prompt: str = system_prompt,
     temperature: float = 0.4,
 ) -> str:
     
@@ -80,7 +80,5 @@ def generate_audit(
         
         with open(save_path, "w", encoding="utf-8") as f:
             json.dump(audit_trace, f, indent=2, ensure_ascii=False)
-
-        print(f"Predictions saved to {save_path}")
 
         return response
