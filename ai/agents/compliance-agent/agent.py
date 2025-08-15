@@ -1,10 +1,7 @@
-import asyncio
 from contextlib import AsyncExitStack
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset,  SseConnectionParams
 import logging 
-import os
-import nest_asyncio  # Kept import here if you want to rely on it, but we guard its usage below
 from google.adk.models.lite_llm import LiteLlm
 
 
@@ -19,8 +16,7 @@ log = logging.getLogger(__name__)
 exit_stack: AsyncExitStack | None = None
 MODEL_GPT_4_1_NANO = "openai/gpt-4.1-nano"
 
-
-
+# --- Agent definition ---
 root_agent = LlmAgent(
   model = LiteLlm(model=MODEL_GPT_4_1_NANO),
   name = "compliance_agent",
