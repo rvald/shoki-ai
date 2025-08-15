@@ -1,6 +1,7 @@
 import requests
-import json
+import json, os
 
+COMPLIANCE_API_URL = os.environ.get("COMPLIANCE_API_URL")
 
 def create_audit(
     transcript: str
@@ -18,7 +19,7 @@ def create_audit(
         requests.exceptions.RequestException: If the request to the API fails.
         json.JSONDecodeError: If the response cannot be parsed as JSON.
     """
-    url = "http://0.0.0.0:8001/api/v1/audit"
+    url = f"{COMPLIANCE_API_URL}/api/v1/audit"
     headers = {"Content-Type": "application/json"}
     payload = {"transcript": transcript}
     

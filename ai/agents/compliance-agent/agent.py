@@ -7,7 +7,7 @@ from google.adk.models.lite_llm import LiteLlm
 
 # Load environment variables from .env file in the parent directory
 # Place this near the top, before using env vars like API keys
-MCP_SERVER_URL = "http://localhost:43111/sse"
+MCP_SERVER_URL = "https://mcp-tool-server-772943814292.us-central1.run.app/sse"
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)

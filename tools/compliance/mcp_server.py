@@ -16,8 +16,8 @@ from google.adk.tools.mcp_tool.conversion_utils import adk_to_mcp_tool_type
 
 from compliance import create_audit
 
-APP_HOST = "localhost"
-APP_PORT =  43111
+APP_HOST = "0.0.0.0"
+APP_PORT =  8080
 
 audit_tool = FunctionTool(create_audit)
 
