@@ -3,6 +3,8 @@ name: Python Unit Tests
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'services/compliance_service/**'
 
 jobs:
   test:
@@ -23,21 +25,17 @@ jobs:
           version: "0.8.7"
 
       - name: Install dependencies
+        working-directory: services/compliance_service
         run: |
             uv venv .venv
             source .venv/bin/activate
-            uv sync --locked --all-extras --dev
+            uv pip install -r requirements.txt
 
-      - name: Install OpenTelemetry dependencies
-        run: uv pip install opentelemetry-distro opentelemetry-exporter-otlp
-
-      - name: Install OpenTelemetry auto instrumentation
-        run: uv run opentelemetry-bootstrap -a requirements | uv pip install --requirement -
-          
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
       - name: Run tests
+        working-directory: services/compliance_service
         run: |
             source .venv/bin/activate
             uv run pytest --import-mode=importlib

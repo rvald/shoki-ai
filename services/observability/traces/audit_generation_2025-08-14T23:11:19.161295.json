@@ -1,0 +1,11 @@
+{
+  "input": "ok",
+  "response": "{\"hipaa_compliant\": false,\"fail_identifiers\":[],\"comments\":\"No transcript was provided for evaluation.\"}",
+  "latency_seconds": 4.021273851394653,
+  "prompt_tokens": 517,
+  "completion_tokens": 193,
+  "total_tokens": 710,
+  "model_name": "gpt-oss",
+  "timestamp": "2025-08-15T03:11:19Z",
+  "operation": "audit_generation"
+}

@@ -1,0 +1,11 @@
+{
+  "input": "This is a test transcript for compliance audit.",
+  "response": "{\n  \"hipaa_compliant\": true,\n  \"fail_identifiers\": [],\n  \"comments\": \"No PHI detected; transcript is compliant.\"\n}",
+  "latency_seconds": 4.572756052017212,
+  "prompt_tokens": 525,
+  "completion_tokens": 109,
+  "total_tokens": 634,
+  "model_name": "gpt-oss",
+  "timestamp": "2025-08-15T03:13:28Z",
+  "operation": "audit_generation"
+}
