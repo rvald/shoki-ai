@@ -1,20 +1,10 @@
-from contextlib import AsyncExitStack
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset,  SseConnectionParams
-import logging 
 from google.adk.models.lite_llm import LiteLlm
-
-
-# Load environment variables from .env file in the parent directory
-# Place this near the top, before using env vars like API keys
-MCP_SERVER_URL = "https://mcp-tool-server-772943814292.us-central1.run.app/sse"
-
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(__name__)
  
 # --- Global variables ---
-exit_stack: AsyncExitStack | None = None
 MODEL_GPT_4_1_NANO = "openai/gpt-4.1-nano"
+MCP_SERVER_URL = "https://mcp-tool-server-772943814292.us-central1.run.app/sse"
 
 # --- Agent definition ---
 root_agent = LlmAgent(
