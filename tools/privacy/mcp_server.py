@@ -17,7 +17,7 @@ from google.adk.tools.mcp_tool.conversion_utils import adk_to_mcp_tool_type
 from privacy import redact_text
 
 APP_HOST = "0.0.0.0"
-APP_PORT =  8088
+APP_PORT =  8080
 
 redact_tool = FunctionTool(redact_text)
 available_tools = {redact_tool.name: redact_tool}

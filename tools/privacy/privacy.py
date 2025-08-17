@@ -1,7 +1,7 @@
 import requests
 import json, os
 
-PRIVACY_API_BASE_URL = "http://localhost:8001"
+PRIVACY_API_BASE_URL = os.environ.get("PRIVACY_API_URL")
 
 def redact_text(
     text: str
