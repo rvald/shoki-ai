@@ -1,10 +1,11 @@
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset,  SseConnectionParams
 from google.adk.models.lite_llm import LiteLlm
- 
+import os
+
 # --- Global variables ---
 MODEL_GPT_4_1_NANO = "openai/gpt-4.1-nano"
-MCP_SERVER_URL = "https://mcp-tool-server-772943814292.us-central1.run.app/sse"
+MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL")
 
 # --- Agent definition ---
 root_agent = LlmAgent(
