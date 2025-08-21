@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Form, status
 import os
 from pathlib import Path
 from ..service import upload_audio_cloud_storage, upload_audio_firestore
+from ..schemas import AudoFileResponse
 
 router = APIRouter()    
 TMP_DIR = Path("temp_audio")
@@ -11,12 +12,13 @@ TMP_DIR.mkdir(parents=True, exist_ok=True)
     "/upload_audio",
     summary="Store audio file",
     description="Store an audio file in GCP Cloud Storage and Firestore.",
+    response_model=AudoFileResponse,
     status_code=status.HTTP_201_CREATED
 )
 async def upload_audio(
     audio_file: UploadFile = File(...), 
     audio_name: str | None = Form(None)
-):
+) -> AudoFileResponse:
     """
     Upload an audio file to GCP Cloud Storage and store its metadata in Firestore.
 
@@ -46,7 +48,19 @@ async def upload_audio(
             public_url=storage_response.get("public_url"),
             audio_file_name=storage_response.get("audio_file_name"),
         )
-        print("Audio file stored successfully:", firestore_response)
+        
+        id = firestore_response.get('id')
+        public_url = firestore_response.get('public_url')
+        audio_name = firestore_response.get('audio_file_name')
+        created_at = firestore_response.get('created_at')
+
+        # Return the response model with the stored audio file metadata
+        return AudoFileResponse(
+            id=id,
+            public_url=public_url,
+            audio_name=audio_name,
+            created_at=created_at
+        )
     
 
     except Exception as e:

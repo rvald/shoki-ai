@@ -1,80 +1,82 @@
-import uuid
+from pydantic import BaseModel, Field
 from datetime import datetime, timezone
+import uuid
 
-class AudioFile:
-    def __init__(
-            self, 
-            public_url: str,
-            audio_name: str
-    ):
-        self.id = str(uuid.uuid4())
-        self.public_url = public_url
-        self.audio_name = audio_name
-        self.created_at = datetime.now(timezone.utc)
+# Schema for audio files in Firestore document and API request/responses
+class AudioFile(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    public_url: str
+    audio_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    def to_dict(self) -> dict:
-        """
-        Convert the AudioFile object to a dictionary representation.
+    model_config = {
+        "json_encoders": { datetime: lambda v: v.isoformat() }
+    }
 
-        Returns:
-            Dictionary containing the file path and audio name.
-        """
-        return {
-            "id": self.id,
-            "public_url": self.public_url,
-            "created_at": self.created_at.isoformat(),
-            "audio_name": self.audio_name
-        }
+class AudoFileResponse(BaseModel):
+    id: str = Field(..., description="Unique identifier for the audio file.")
+    public_url: str = Field(..., description="Public URL of the stored audio file.")
+    audio_name: str = Field(..., description="Name of the audio file.")
+    created_at: datetime = Field(..., description="Timestamp of when the audio file was created.")
     
-class RedactedTranscript:
-    def __init__(
-            self, 
-            redacted_text: str,
-            audio_id: str,
-            audio_file_name: str
-    ):
-        self.id = str(uuid.uuid4())
-        self.redacted_text = redacted_text
-        self.audio_id = audio_id
-        self.audio_file_name = audio_file_name
-        self.created_at = datetime.now(timezone.utc)
+    model_config = {
+        "json_encoders": { datetime: lambda v: v.isoformat() }
+    }   
 
-    def to_dict(self) -> dict:
-        """
-        Convert the RedactedTranscript object to a dictionary representation.
+# Schema for redacted transcripts in Firestore document and API request/responses
+class RedactedTranscript(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    redacted_text: str
+    audio_id: str
+    audio_file_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-        Returns:
-            Dictionary containing the redacted text, audio ID, and creation timestamp.
-        """
-        return {
-            "id": self.id,
-            "redacted_text": self.redacted_text,
-            "audio_id": self.audio_id,
-            "audio_file_name": self.audio_file_name,
-            "created_at": self.created_at.isoformat()
-        }   
+    model_config = {
+        "json_encoders": { datetime: lambda v: v.isoformat() }
+    }
+
+
+class RedactedTranscriptRequest(BaseModel):
+    redacted_text: str = Field(..., description="The redacted transcribed text.")
+    audio_id: str = Field(..., description="Unique identifier for the audio file in FireStore.")
+    audio_file_name: str = Field(..., description="Name of the audio file associated with the transcript.")
+
+
+class RedactedTranscriptResponse(BaseModel):
+    id: str = Field(..., description="Unique identifier for the redacted transcript.")
+    redacted_text: str = Field(..., description="The redacted transcribed text.")
+    audio_id: str = Field(..., description="Unique identifier for the audio file in FireStore.")
+    audio_file_name: str = Field(..., description="Name of the audio file associated")
+    created_at: datetime = Field(..., description="Timestamp of when the redacted transcript was created.")
     
-class SOAPNote:
-    def __init__(
-            self, 
-            soap_note: str,
-            redacted_id: str
-    ):
-        self.id = str(uuid.uuid4())
-        self.soap_note = soap_note
-        self.redacted_id = redacted_id
-        self.created_at = datetime.now(timezone.utc)
+    model_config = {
+        "json_encoders": { datetime: lambda v: v.isoformat() }
+    }
 
-    def to_dict(self) -> dict:
-        """
-        Convert the SOAPNote object to a dictionary representation.
+# Schema for soap notes in Firestore document and API request/responses
+class SOAPNote(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    soap_note: str
+    redacted_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-        Returns:
-            Dictionary containing the SOAP note text, redacted ID, and creation timestamp.
-        """
-        return {
-            "id": self.id,
-            "soap_note": self.soap_note,
-            "redacted_id": self.redacted_id,
-            "created_at": self.created_at.isoformat()
-        }
+    model_config = {
+        "json_encoders": { datetime: lambda v: v.isoformat() }
+    }
+
+
+class SOAPNoteRequest(BaseModel):
+    soap_note: str = Field(..., description="The generated SOAP note text.")
+    redacted_id: str = Field(..., description="Unique identifier for the redacted transcript in FireStore.")
+    audio_file_name: str = Field(..., description="Name of the audio file associated with the SOAP note.")
+
+
+class SOAPNoteResponse(BaseModel):
+    id: str = Field(..., description="Unique identifier for the SOAP note.")
+    soap_note: str = Field(..., description="The generated SOAP note text.")
+    redacted_id: str = Field(..., description="Unique identifier for the redacted transcript in FireStore.")
+    created_at: datetime = Field(..., description="Timestamp of when the SOAP note was created.")
+    
+    model_config = {
+        "json_encoders": { datetime: lambda v: v.isoformat() }
+    }

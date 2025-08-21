@@ -63,12 +63,16 @@ def upload_audio_firestore(
     
     db = firestore.Client(project=GOOGLE_PROJECT_ID)
     audio_ref = db.collection(FIRESTORE_AUDIO_COLLECTION)
-    result = audio_ref.document(audio_file_name).set(
+    audio_ref.document(audio_file_name).set(
         AudioFile(
             public_url=public_url,
             audio_name=audio_file_name
-        ).to_dict()
+        ).model_dump()
     )
+
+    doc_ref = audio_ref.document(audio_file_name)
+    doc = doc_ref.get()
+    result = doc.to_dict() if doc.exists else {}
 
     return result
 
@@ -95,13 +99,17 @@ def upload_redacted_transcript_firestore(
 
     db = firestore.Client(project=GOOGLE_PROJECT_ID)
     audio_ref = db.collection("redacted_transcripts")
-    result = audio_ref.document(audio_file_name).set(
+    audio_ref.document(audio_file_name).set(
         RedactedTranscript(
             redacted_text=redacted_text,
             audio_file_name=audio_file_name,
             audio_id=audio_id
-        ).to_dict()
+        ).model_dump()
     )
+
+    doc_ref = audio_ref.document(audio_file_name)
+    doc = doc_ref.get()
+    result = doc.to_dict() if doc.exists else {}
 
     return result
 
@@ -127,12 +135,16 @@ def upload_soap_note_firestore(
 
     db = firestore.Client(project=GOOGLE_PROJECT_ID)
     soap_ref = db.collection("soap_notes")
-    result = soap_ref.document(audio_file_name).set(
+    soap_ref.document(audio_file_name).set(
         SOAPNote(
             soap_note=soap_note,
             redacted_id=redacted_id
-        ).to_dict()
+        ).model_dump()
     )
+
+    doc_ref = soap_ref.document(audio_file_name)
+    doc = doc_ref.get()
+    result = doc.to_dict() if doc.exists else {}
 
     return result
 
