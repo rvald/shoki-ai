@@ -19,8 +19,6 @@ async def upload_transcript(
 
     Args:
         redacted_text (str): The redacted transcribed text.
-        audio_id (str): Unique identifier for the audio file in Firestore.
-        audio_file_name (str): Name of the audio file.
 
     Returns:
         dict: A dictionary containing the metadata of the stored transcript.
@@ -28,9 +26,7 @@ async def upload_transcript(
     try:    
         # Store the redacted transcript in Firestore
         firestore_response = upload_redacted_transcript_firestore(
-            redacted_text=payload.redacted_text,
-            audio_id=payload.audio_id,
-            audio_file_name=payload.audio_file_name
+            redacted_text=payload.redacted_text
         )
         
         id = firestore_response.get('id')

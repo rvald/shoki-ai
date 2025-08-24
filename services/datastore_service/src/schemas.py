@@ -38,10 +38,8 @@ class RedactedTranscript(BaseModel):
 
 class RedactedTranscriptRequest(BaseModel):
     redacted_text: str = Field(..., description="The redacted transcribed text.")
-    audio_id: str = Field(..., description="Unique identifier for the audio file in FireStore.")
-    audio_file_name: str = Field(..., description="Name of the audio file associated with the transcript.")
-
-
+    audio_file_public_url: str = Field(..., description="The public url of the audio file in gcp")
+    
 class RedactedTranscriptResponse(BaseModel):
     id: str = Field(..., description="Unique identifier for the redacted transcript.")
     redacted_text: str = Field(..., description="The redacted transcribed text.")

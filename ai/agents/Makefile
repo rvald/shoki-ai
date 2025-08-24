@@ -10,6 +10,7 @@ GOOGLE_GENAI_USE_VERTEXAI ?= True
 MCP_SERVER_URL ?= "https://mcp-tool-server-772943814292.us-central1.run.app/sse"
 PRIVACY_MCP_SERVER_URL ?= "https://privacy-mcp-tool-server-772943814292.us-central1.run.app/sse"
 SOAP_MCP_SERVER_URL ?= "https://soap-note-mcp-tool-server-772943814292.us-central1.run.app/sse"
+TRANSCRIBE_MCP_SERVER_URL ?= "https://transcribe-mcp-tool-server-772943814292.us-central1.run.app/sse"
 
 
 # Deploy the Cloud Run service
@@ -26,6 +27,7 @@ deploy:
 	  --set-env-vars="GOOGLE_CLOUD_LOCATION=$(GOOGLE_CLOUD_LOCATION)" \
 	  --set-env-vars="OPENAI_API_KEY=$(OPENAI_API_KEY)" \
 	  --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=$(GOOGLE_GENAI_USE_VERTEXAI)" \
+	  --set-env-vars="TRANSCRIBE_MCP_SERVER_URL=$(TRANSCRIBE_MCP_SERVER_URL)" \
 
 # Optional helper
 help:

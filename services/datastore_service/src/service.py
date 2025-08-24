@@ -86,8 +86,6 @@ def upload_audio_firestore(
 
 def upload_redacted_transcript_firestore(
         redacted_text: str,
-        audio_id: str,
-        audio_file_name: str
 ) -> dict:
     """
     Store the redacted transcript in Firestore.

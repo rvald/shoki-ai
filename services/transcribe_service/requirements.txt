@@ -1,0 +1,4 @@
+fastapi[standard]>=0.116.1
+openai-whisper>=20250625
+pydantic>=2.11.7
+google-cloud-storage>=3.3.0
