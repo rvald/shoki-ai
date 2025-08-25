@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form, status
 import os
 from pathlib import Path
-from ..service import upload_audio_cloud_storage, upload_audio_firestore
+from ..service import upload_audio_cloud_storage, upload_audio_firestore, caf_to_wav
 from ..schemas import AudoFileResponse
 
 router = APIRouter()    
@@ -40,8 +40,10 @@ async def upload_audio(
         with open(tmp_file_path, "wb") as f:
             f.write(await audio_file.read())
 
+        wav_out = caf_to_wav(tmp_file_path)
+
         # Store the audio file in GCP Cloud Storage
-        storage_response = upload_audio_cloud_storage(audio_name, tmp_file_path)
+        storage_response = upload_audio_cloud_storage(audio_name, wav_out)
 
         # Store the audio file metadata in Firestore
         firestore_response = upload_audio_firestore(
@@ -51,7 +53,7 @@ async def upload_audio(
         
         id = firestore_response.get('id')
         public_url = firestore_response.get('public_url')
-        audio_name = firestore_response.get('audio_file_name')
+        audio_name = firestore_response.get('audio_name')
         created_at = firestore_response.get('created_at')
 
         # Return the response model with the stored audio file metadata

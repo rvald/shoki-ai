@@ -1,10 +1,22 @@
 from google.cloud import storage, firestore
-from .schemas import AudioFile, RedactedTranscript,SOAPNote
+from .schemas import AudioFile, RedactedTranscript, SOAPNote
+import subprocess
+from pathlib import Path
 import os
 
-GOOCLE_CLOUD_STORAGE_BUCKET = os.environ.get("GOOCLE_CLOUD_STORAGE_BUCKET")
+GOOGLE_CLOUD_STORAGE_BUCKET = os.environ.get("GOOGLE_CLOUD_STORAGE_BUCKET")
 GOOGLE_PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 FIRESTORE_AUDIO_COLLECTION = os.environ.get("FIRESTORE_AUDIO_COLLECTION")
+
+
+def caf_to_wav(input_path: str | Path, output_path: str | Path | None = None) -> Path:
+    input_path = Path(input_path)
+    output_path = Path(output_path) if output_path else input_path.with_suffix(".wav")
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(input_path), str(output_path)],
+        check=True
+    )
+    return output_path
 
 # store the audio file in gcp cloud storage
  # grab the public url of the file, and store a reference to in firestore
@@ -27,8 +39,8 @@ def upload_audio_cloud_storage(
     """
 
     storage_client = storage.Client()
-    bucket = storage_client.bucket(GOOCLE_CLOUD_STORAGE_BUCKET)
-    blob = bucket.blob(audio_name)
+    bucket = storage_client.bucket(GOOGLE_CLOUD_STORAGE_BUCKET)
+    blob = bucket.blob(str(Path(audio_name).with_suffix(".wav")))
 
     try:
         blob.upload_from_filename(file_path)
@@ -86,6 +98,8 @@ def upload_audio_firestore(
 
 def upload_redacted_transcript_firestore(
         redacted_text: str,
+        audio_file_name: str,
+        audio_id: str
 ) -> dict:
     """
     Store the redacted transcript in Firestore.
