@@ -1,50 +1,130 @@
-from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
-from presidio_anonymizer import AnonymizerEngine
+import os, hashlib
+from typing import Dict, Optional, List
+from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern, RecognizerResult
+from presidio_anonymizer import AnonymizerEngine  # kept for future ops if needed
 
-def anonymize_transcript(text: str):
+from .schemas import RedactRequest, RedactResponse, RedactionSummary
+from .exceptions import RetryableError, PermanentError
+from .logging import jlog
+from .storage import load_artifact, save_artifact
 
-    # Example: recognizes patterns like "892 Maple Avenue, Springfield, IL 62704"
-    address_pattern = Pattern(
-        name="us_address_pattern",
-        regex=r"\b\d{1,6}\s+[A-Z][a-zA-Z]+\s(?:[A-Z][a-zA-Z]+\s)?(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Trail|Trl|Parkway|Pkwy)\b(?:,)?\s+[A-Za-z .'-]+,\s*[A-Za-z]{2}\s+\d{5}\b",
-        score=0.5,  # Confidence between 0 (low) and 1 (high)
-    )
+# Global engines (faster)
+_ANALYZER: Optional[AnalyzerEngine] = None
+_ANONYMIZER: Optional[AnonymizerEngine] = None
 
-    # Instantiate recognizer with entity type ADDRESS
-    custom_address_recognizer = PatternRecognizer(
-        supported_entity="ADDRESS",
-        patterns=[address_pattern],
-        supported_language="en"
-    )
+# Salt for deterministic masking (set in env for stability across runs)
+REDACTION_SALT = os.getenv("REDACTION_SALT", "dev-salt-change-in-prod")
 
-    text_to_analyze = text.strip()
+def _init_engines():
+    global _ANALYZER, _ANONYMIZER
+    if _ANALYZER is None:
+        _ANALYZER = AnalyzerEngine()
+        # Add custom US address recognizer
+        address_pattern = Pattern(
+            name="us_address_pattern",
+            regex=r"\b\d{1,6}\s+[A-Z][a-zA-Z]+\s(?:[A-Z][a-zA-Z]+\s)?(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Trail|Trl|Parkway|Pkwy)\b(?:,)?\s+[A-Za-z .'-]+,\s*[A-Za-z]{2}\s+\d{5}\b",
+            score=0.5,
+        )
+        custom_address = PatternRecognizer(
+            supported_entity="ADDRESS", patterns=[address_pattern], supported_language="en"
+        )
+        _ANALYZER.registry.add_recognizer(custom_address)
+    if _ANONYMIZER is None:
+        _ANONYMIZER = AnonymizerEngine()
 
-    analyzer = AnalyzerEngine()
+def _deterministic_token(
+    entity_type: str, 
+    raw_text: str
+) -> str:
+    digest = hashlib.sha256((REDACTION_SALT + raw_text).encode("utf-8")).hexdigest()[:8]
+    # Bracketed placeholder; preserves readability/structure
+    return f"[{entity_type}_{digest}]"
 
-    # Add your custom recognizer to the registry
-    analyzer.registry.add_recognizer(custom_address_recognizer)
+def _apply_deterministic_mask(
+    text: str, 
+    results: List[RecognizerResult]
+) -> str:
+    # Sort by start; skip overlaps; build output
+    ordered = sorted(results, key=lambda r: (r.start, r.end))
+    out = []
+    cursor = 0
+    for r in ordered:
+        if r.start is None or r.end is None:
+            continue
+        start, end = int(r.start), int(r.end)
+        if start < cursor:  # overlap; skip the inner one
+            continue
+        out.append(text[cursor:start])
+        span = text[start:end]
+        token = _deterministic_token(r.entity_type, span)
+        out.append(token)
+        cursor = end
+    out.append(text[cursor:])
+    return "".join(out)
 
-    entities_to_detect = [
-        "ADDRESS",
-        "PERSON",
-        "LOCATION",
-        "DATE_TIME",
-        "EMAIL_ADDRESS",
-        "PHONE_NUMBER",
-        "US_SSN",
-        "US_PASSPORT",
-        "AGE",
-        "MEDICAL_LICENSE",
-        "CREDIT_CARD"
-    ]
-    
-    analyzer_results = analyzer.analyze(
-        text=text_to_analyze, 
-        entities=entities_to_detect,
-        language="en"
-    )
+def _entity_counts(
+    results: List[RecognizerResult]
+) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for r in results:
+        counts[r.entity_type] = counts.get(r.entity_type, 0) + 1
+    return counts
 
-    anonymizer = AnonymizerEngine()
-    anonymized = anonymizer.anonymize(text=text_to_analyze, analyzer_results=analyzer_results)
-    return anonymized.text
+def redact_with_idempotency(
+    req: RedactRequest,
+    correlation_id: Optional[str],
+    idempotency_key: Optional[str],
+    simulate_mode: Optional[str] = None
+) -> RedactResponse:
+    if not req.text or not req.text.strip():
+        raise PermanentError("Empty text")
 
+    # Cache
+    cached = load_artifact(idempotency_key)
+    if cached:
+        jlog(event="redact_cache_hit",
+             correlation_id=correlation_id, idempotency_key=idempotency_key,
+             text_len=len(req.text))
+        return cached
+
+    # Simulate failures for testing (keep inside main function so callers can retry)
+    if simulate_mode == "retryable-once":
+        # Keep a per-request flip-flop via idempotency_key; simple global map could be used like in transcribe
+        # Here, we just raise; orchestrator/worker layer will cause a retry of the whole step
+        raise RetryableError("SIM: retryable-once")
+    if simulate_mode == "retryable-always":
+        raise RetryableError("SIM: retryable-always")
+    if simulate_mode == "permanent":
+        raise PermanentError("SIM: permanent")
+
+    # Analyze + redact
+    try:
+        _init_engines()
+        entities_to_detect = [
+            "ADDRESS","PERSON","LOCATION","DATE_TIME","EMAIL_ADDRESS","PHONE_NUMBER",
+            "US_SSN","US_PASSPORT","AGE","MEDICAL_LICENSE","CREDIT_CARD"
+        ]
+        results = _ANALYZER.analyze(text=req.text, entities=entities_to_detect, language=req.language or "en")
+        redacted_text = _apply_deterministic_mask(req.text, results) if req.stable_masking else _ANONYMIZER.anonymize(
+            text=req.text, analyzer_results=results
+        ).text
+
+        summary = RedactionSummary(
+            entities=_entity_counts(results),
+            total=len(results),
+            policy=req.policy,
+        )
+        resp = RedactResponse(text=redacted_text, summary=summary)
+        save_artifact(idempotency_key, resp)
+
+        jlog(event="redact_ok",
+             correlation_id=correlation_id, idempotency_key=idempotency_key,
+             text_len=len(req.text), entities=summary.entities, total=summary.total)
+        return resp
+
+    except RetryableError:
+        raise
+    except Exception as e:
+        # Most analyzer errors are permanent (bad language packs etc.); classify conservatively
+        # If you integrate external services later, split retryable vs permanent more precisely.
+        raise PermanentError(f"redaction failure: {e}") from e

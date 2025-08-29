@@ -1,7 +1,18 @@
+from typing import Dict, Optional
 from pydantic import BaseModel, Field
 
 class RedactRequest(BaseModel):
-    text: str = Field(..., min_length=1, description="Text to redact")
+    text: str = Field(..., description="Transcript text to redact (PHI)")
+    language: Optional[str] = Field(default="en")
+    policy: Optional[str] = Field(default="HIPAA Safe Harbor + extras")
+    stable_masking: Optional[bool] = Field(default=True)
+
+class RedactionSummary(BaseModel):
+    entities: Dict[str, int] = Field(default_factory=dict)
+    total: int = 0
+    policy: Optional[str] = None
 
 class RedactResponse(BaseModel):
-    text: str = Field(..., min_length=1, description="Redacted text after processing")
+    text: str = Field(..., description="Redacted text")
+    summary: RedactionSummary = Field(default_factory=RedactionSummary)
+    version: str = "v1"

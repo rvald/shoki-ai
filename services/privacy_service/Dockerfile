@@ -15,7 +15,7 @@ COPY requirements.txt /app/requirements.txt
 RUN uv pip install -r requirements.txt
 
 # --- Install NLP engine used with presidio ---
-RUN uv run spacy download en_core_web_lg
+RUN uv run spacy download en_core_web_sm
 
 # --- Application Code ---
 COPY . /app
