@@ -34,8 +34,9 @@ If elements are not discussed, state “Not documented in transcript.”
 Use concise, actionable bullet points and include responsible party and timing when stated (e.g., “Order CBC today,” “Follow up in 2 weeks,” “Patient to begin…,” “Referral to cardiology placed”).
 Formatting requirements
 
-Wrap the entire note in <soap_note> … </soap_note> tags.
-Use the exact headings: Subjective, Objective, Assessment, Plan.
+Return ONLY valid JSON with this exact schema: { "soap_note": "<soap_note>\nSubjective\n...\n\nObjective\n...\n\nAssessment\n...\n\nPlan\n...\n</soap_note>" }
+Do not include markdown/code fences, explanations, or any text outside the JSON object.
+The soap_note value must include the <soap_note> tags and the four section headings exactly.
 Use brief paragraphs or bullet points for readability.
 Do not include any text outside the <soap_note> tags.
 Handling edge cases

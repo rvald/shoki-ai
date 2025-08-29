@@ -1,7 +1,10 @@
 from pydantic import BaseModel, Field
+from typing import Optional
 
 class SoapNoteRequest(BaseModel):
-    text: str = Field(..., min_length=1, description="Transcript text to use for generating SOAP note")
+    text: str = Field(..., description="Redacted transcript text (no raw PHI)")
+    language: Optional[str] = Field(default=None)
 
-class SoapNoteRequestResponse(BaseModel):
-    soap_note: str = Field(..., min_length=1, description="Generated SOAP note from the transcript")
+class SoapNoteResponse(BaseModel):
+    soap_note: str = Field(..., description="SOAP note string")
+    version: str = "v1"
