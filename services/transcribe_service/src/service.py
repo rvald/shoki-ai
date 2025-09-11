@@ -2,7 +2,6 @@ import os, time, hashlib
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
-from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type, before_sleep_log
 from .schemas import TranscriptionRequest, TranscriptionResponse, Transcription, Segment
 from .exceptions import RetryableError, PermanentError
 from .logging import jlog
@@ -32,25 +31,11 @@ def hash_preview(
 ) -> str:
     return f"sha256={hashlib.sha256(s.encode()).hexdigest()[:12]},len={len(s)}"
 
-@retry(wait=wait_exponential(multiplier=0.5, min=1, max=8),
-       stop=stop_after_attempt(2),
-       retry=retry_if_exception_type(RetryableError),
-       before_sleep=before_sleep_log(retry_logger, logging.WARNING))
-def run_transcribe_step(local_path: str,
-                        language_hint: Optional[str],
-                        simulate_mode: Optional[str],
-                        idempotency_key: Optional[str]) -> Dict[str, Any]:
-    # Simulate failures INSIDE the retried function
-    if simulate_mode:
-        key = idempotency_key or f"default:{local_path}"
-        count = _SIM_ATTEMPTS.get(key, 0)
-        if simulate_mode == "retryable-once" and count == 0:
-            _SIM_ATTEMPTS[key] = count + 1
-            raise RetryableError("SIM: retryable-once")
-        if simulate_mode == "retryable-always":
-            raise RetryableError("SIM: retryable-always")
-        if simulate_mode == "permanent":
-            raise PermanentError("SIM: permanent")
+
+def run_transcribe_step(
+    local_path: str,
+    language_hint: Optional[str]
+) -> Dict[str, Any]:
 
     # Actual backend
     return transcribe_backend(local_path, language_hint)
@@ -70,10 +55,10 @@ def transcribe_backend(
             task="transcribe",
             verbose=False,
         )
-        segments = [{"start": s["start"], "end": s["end"], "text": s["text"].strip()}
+        segments = [{"start": s["start"], "end": s["end"], "text": s["text"].strip()} # type: ignore
                     for s in result.get("segments", [])]
         return {
-            "text": result.get("text", "").strip(),
+            "text": result.get("text", "").strip(), # type: ignore
             "language": result.get("language"),
             "segments": segments,
             "duration": result.get("duration", 0),
@@ -120,21 +105,20 @@ def derive_idempotency_key(
 def transcribe_with_idempotency(
     req: TranscriptionRequest,
     correlation_id: Optional[str],
-    idempotency_key: Optional[str],
-    simulate_mode: Optional[str] = None
+    idempotency_key: Optional[str]
 ) -> TranscriptionResponse:
     # Step-level cache
     cached = load_artifact(idempotency_key)
     if cached:
         jlog(event="transcribe_cache_hit",
              correlation_id=correlation_id, idempotency_key=idempotency_key,
-             audio=hash_preview(req.audio_file_name))
+             audio=hash_preview(req.name))
         return cached
 
     # Download audio
     start_dl = time.time()
     try:
-        local_path = download_blob_to_tmp(req.audio_file_name, req.bucket)
+        local_path = download_blob_to_tmp(req.name, req.bucket)
     except FileNotFoundError as e:
         raise PermanentError(str(e))
     except Exception as e:
@@ -144,7 +128,7 @@ def transcribe_with_idempotency(
     # Transcribe
     start_tx = time.time()
     try:
-        payload = run_transcribe_step(local_path, req.language_hint, simulate_mode, idempotency_key)
+        payload = run_transcribe_step(local_path, req.language_hint)
     finally:
         # Cleanup temp file
         try:
@@ -156,13 +140,13 @@ def transcribe_with_idempotency(
             pass
     tx_ms = int((time.time() - start_tx) * 1000)
 
-    resp = build_response(payload, audio_name=req.audio_file_name)
+    resp = build_response(payload, audio_name=req.name)
     # Persist artifact for reuse
     save_artifact(idempotency_key, resp)
 
     jlog(event="transcribe_ok",
          correlation_id=correlation_id,
          idempotency_key=idempotency_key,
-         audio=hash_preview(req.audio_file_name),
+         audio=hash_preview(req.name),
          download_ms=dl_ms, transcribe_ms=tx_ms)
     return resp

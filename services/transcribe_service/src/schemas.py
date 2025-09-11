@@ -16,7 +16,7 @@ class Transcription(BaseModel):
 
 class TranscriptionRequest(BaseModel):
     # Required; your orchestrator will pass the same fields it received
-    audio_file_name: str
+    name: str
     bucket: Optional[str] = None           # if you prefer env bucket, leave None
     generation: Optional[str] = None       # helps idempotency; include if known
     language_hint: Optional[str] = None

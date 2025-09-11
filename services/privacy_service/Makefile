@@ -10,11 +10,16 @@ REGION ?= us-central1
 PROJECT_ID ?= shoki-api
 REPO_NAME ?= compliance-repo
 SERVICE_NAME ?= privacy-service
-OLLAMA_GCS_URL ?= https://ollama-gcs-772943814292.us-central1.run.app
 
 # Build and deploy image paths (as per your script)
 IMAGE_PATH_BUILD := $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_PATH_DEPLOY := $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)
+
+
+USE_CLOUD_TRACE ?=true
+ENVIRONMENT ?=prod
+SERVICE_NAME ?=privacy-service
+PRIVACY_ARTIFACT_BUCKET ?= "shoki-ai-privacy-service"
 
 
 # Build the container image and push to Artifact Registry
@@ -36,6 +41,10 @@ deploy:
 	  --set-env-vars="APP_PORT=8080" \
 	  --set-env-vars="GOOGLE_CLOUD_LOCATION=$(REGION)" \
 	  --set-env-vars="GOOGLE_CLOUD_PROJECT=$(PROJECT_ID)" \
+	  --set-env-vars="USE_CLOUD_TRACE=$(USE_CLOUD_TRACE)" \
+	  --set-env-vars="ENVIRONMENT=$(ENVIRONMENT)" \
+	  --set-env-vars="SERVICE_NAME=$(SERVICE_NAME)" \
+	  --set-env-vars="PRIVACY_ARTIFACT_BUCKET=$(PRIVACY_ARTIFACT_BUCKET)" \
 	  --project=$(PROJECT_ID) \
 	  --min-instances=0
 

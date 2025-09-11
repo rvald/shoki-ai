@@ -12,7 +12,7 @@ AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Example allowed origins for CORS
 ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
 # Set web=True if you intend to serve a web interface, False otherwise
-SERVE_WEB_INTERFACE = False
+SERVE_WEB_INTERFACE = True
 
 # Call the function to get the FastAPI app instance
 # Ensure the agent directory name ('capital_agent') matches your agent folder

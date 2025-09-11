@@ -22,10 +22,10 @@ async def transcribe_audio_endpoint(
     x_simulate_failure: str | None = Header(default=None)
 ) -> TranscriptionResponse:
     # Basic input validation
-    if not payload.audio_file_name:
+    if not payload.name:
         raise HTTPException(status_code=400, detail="audio_file_name is required")
 
-    idem = derive_idempotency_key(x_idempotency_key, payload.bucket, payload.audio_file_name, payload.generation)
+    idem = derive_idempotency_key(x_idempotency_key, payload.bucket, payload.name, payload.generation)
 
     try:
         return transcribe_with_idempotency(payload, x_correlation_id, idem, simulate_mode=x_simulate_failure)

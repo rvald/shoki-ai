@@ -4,6 +4,7 @@ from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_excep
 from openai import OpenAI
 from openai import APIError, RateLimitError, APITimeoutError, APIConnectionError, BadRequestError
 from opentelemetry import trace
+from datetime import datetime
 
 from .exceptions import RetryableError, PermanentError
 from .logging import jlog
@@ -28,10 +29,7 @@ def _make_client() -> OpenAI:
         raise PermanentError("Missing OLLAMA_GCS_URL for Compliance service")
     return OpenAI(base_url=f"{BASE_URL}/v1", api_key="dummy")
 
-@retry(wait=wait_exponential(multiplier=0.5, min=1, max=8),
-       stop=stop_after_attempt(2),
-       retry=retry_if_exception_type(RetryableError),
-       before_sleep=before_sleep_log(retry_logger, logging.WARNING))
+
 def _call_llm_with_guardrails(
     redacted_text: str,
     correlation_id: Optional[str],
@@ -51,9 +49,9 @@ def _call_llm_with_guardrails(
     try:
         kwargs = dict(model=AUDIT_MODEL, messages=messages, temperature=0.4, timeout=AUDIT_TIMEOUT_S)
         if AUDIT_JSON_MODE:
-            kwargs["response_format"] = {"type": "json_object"}  # if supported by your backend
+            kwargs["response_format"] = {"type": "json_object"}  # type: ignore # if supported by your backend
         start = time.time()
-        completion = client.chat.completions.create(**kwargs)
+        completion = client.chat.completions.create(**kwargs) # type: ignore
         elapsed = time.time() - start
     except (APITimeoutError, APIConnectionError) as e:
         raise RetryableError(f"LLM timeout/conn: {e}") from e
@@ -63,8 +61,6 @@ def _call_llm_with_guardrails(
         if getattr(e, "status_code", 500) >= 500:
             raise RetryableError(f"LLM server error: {e}") from e
         raise PermanentError(f"LLM API error: {e}") from e
-    except BadRequestError as e:
-        raise PermanentError(f"LLM bad request: {e}") from e
     except Exception as e:
         raise RetryableError(f"LLM unknown error: {e}") from e
 
@@ -104,8 +100,7 @@ def _call_llm_with_guardrails(
 def generate_audit_with_idempotency(
     req: AuditRequest,
     correlation_id: Optional[str],
-    idempotency_key: Optional[str],
-    simulate_mode: Optional[str] = None,
+    idempotency_key: Optional[str]
 ) -> AuditResponse:
     if not req.transcript or not req.transcript.strip():
         raise PermanentError("Empty transcript")
@@ -117,12 +112,6 @@ def generate_audit_with_idempotency(
              transcript_hash=_hash_preview(req.transcript))
         return cached
 
-    # Simulated failures (test-only)
-    if simulate_mode == "retryable-always":
-        raise RetryableError("SIM: retryable-always")
-    if simulate_mode == "permanent":
-        raise PermanentError("SIM: permanent")
-
     with tracer.start_as_current_span("AuditGeneration") as span:
         # Privacy-safe span attrs
         span.set_attribute("operation", "audit_generation")
@@ -131,6 +120,7 @@ def generate_audit_with_idempotency(
         span.set_attribute("correlation_id", correlation_id or "")
 
         data = _call_llm_with_guardrails(req.transcript, correlation_id)
+        
         resp = AuditResponse(**data)
         save_artifact(idempotency_key, resp)
 
@@ -172,7 +162,7 @@ def generate_audit(
         )
         elapsed = time.time() - start_time
 
-        response = completion.choices[0].message.content.strip()
+        response = completion.choices[0].message.content.strip() # type: ignore
         usage = getattr(completion, "usage", None)
 
         if usage:

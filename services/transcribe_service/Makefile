@@ -15,6 +15,10 @@ SERVICE_NAME ?= transcribe-service
 IMAGE_PATH_BUILD := $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_PATH_DEPLOY := $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)
 
+USE_CLOUD_TRACE ?=true
+ENVIRONMENT ?=prod
+SERVICE_NAME ?=transcribe-service
+TRANSCRIBE_ARTIFACT_BUCKET ?= "shoki-ai-transcribe-service"
 
 # Build the container image and push to Artifact Registry
 build:
@@ -37,6 +41,10 @@ deploy:
 	  --set-env-vars="GOOGLE_CLOUD_PROJECT=$(PROJECT_ID)" \
 	  --set-env-vars="GOOGLE_CLOUD_STORAGE_BUCKET=$(GOOGLE_CLOUD_STORAGE_BUCKET)" \
 	  --set-env-vars="GOOGLE_PROJECT_ID=$(PROJECT_ID)" \
+	  --set-env-vars="USE_CLOUD_TRACE=$(USE_CLOUD_TRACE)" \
+	  --set-env-vars="ENVIRONMENT=$(ENVIRONMENT)" \
+	  --set-env-vars="SERVICE_NAME=$(SERVICE_NAME)" \
+	  --set-env-vars="TRANSCRIBE_ARTIFACT_BUCKET=$(TRANSCRIBE_ARTIFACT_BUCKET)" \
 	  --project=$(PROJECT_ID) \
 	  --min-instances=0
 

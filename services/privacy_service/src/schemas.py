@@ -2,7 +2,8 @@ from typing import Dict, Optional
 from pydantic import BaseModel, Field
 
 class RedactRequest(BaseModel):
-    text: str = Field(..., description="Transcript text to redact (PHI)")
+    bucket: str = Field(..., description="GCS bucket where transcription artifact is stored")
+    idem_key: str = Field(..., description="Key to use when fetching transcription artifact")
     language: Optional[str] = Field(default="en")
     policy: Optional[str] = Field(default="HIPAA Safe Harbor + extras")
     stable_masking: Optional[bool] = Field(default=True)

@@ -6,7 +6,7 @@ from presidio_anonymizer import AnonymizerEngine  # kept for future ops if neede
 from .schemas import RedactRequest, RedactResponse, RedactionSummary
 from .exceptions import RetryableError, PermanentError
 from .logging import jlog
-from .storage import load_artifact, save_artifact
+from .storage import download_blob, save_artifact
 
 # Global engines (faster)
 _ANALYZER: Optional[AnalyzerEngine] = None
@@ -73,41 +73,32 @@ def _entity_counts(
 def redact_with_idempotency(
     req: RedactRequest,
     correlation_id: Optional[str],
-    idempotency_key: Optional[str],
-    simulate_mode: Optional[str] = None
+    idempotency_key: Optional[str]
 ) -> RedactResponse:
-    if not req.text or not req.text.strip():
-        raise PermanentError("Empty text")
-
-    # Cache
-    cached = load_artifact(idempotency_key)
-    if cached:
-        jlog(event="redact_cache_hit",
-             correlation_id=correlation_id, idempotency_key=idempotency_key,
-             text_len=len(req.text))
-        return cached
-
-    # Simulate failures for testing (keep inside main function so callers can retry)
-    if simulate_mode == "retryable-once":
-        # Keep a per-request flip-flop via idempotency_key; simple global map could be used like in transcribe
-        # Here, we just raise; orchestrator/worker layer will cause a retry of the whole step
-        raise RetryableError("SIM: retryable-once")
-    if simulate_mode == "retryable-always":
-        raise RetryableError("SIM: retryable-always")
-    if simulate_mode == "permanent":
-        raise PermanentError("SIM: permanent")
+    
+    jlog(event="redact_start", correlation_id=correlation_id, idempotency_key=req.idem_key, bucket=req.bucket)
+    
+    if not req.idem_key or not req.bucket:
+        raise PermanentError("Empty idempotency key")
 
     # Analyze + redact
     try:
+        transcript_data = download_blob(req.bucket, req.idem_key)
+    
+        transcript_data = transcript_data.get("transcription", "")
+        text = transcript_data.get("text", "")
+        if not text:
+            raise PermanentError("Empty transcript text")
+
         _init_engines()
         entities_to_detect = [
             "ADDRESS","PERSON","LOCATION","DATE_TIME","EMAIL_ADDRESS","PHONE_NUMBER",
             "US_SSN","US_PASSPORT","AGE","MEDICAL_LICENSE","CREDIT_CARD"
         ]
-        results = _ANALYZER.analyze(text=req.text, entities=entities_to_detect, language=req.language or "en")
-        redacted_text = _apply_deterministic_mask(req.text, results) if req.stable_masking else _ANONYMIZER.anonymize(
-            text=req.text, analyzer_results=results
-        ).text
+        results = _ANALYZER.analyze(text=text, entities=entities_to_detect, language=req.language or "en") # type: ignore
+        redacted_text = _apply_deterministic_mask(text, results) if req.stable_masking else _ANONYMIZER.anonymize( # type: ignore
+            text=text, analyzer_results=results # type: ignore
+        ).text 
 
         summary = RedactionSummary(
             entities=_entity_counts(results),
@@ -119,7 +110,7 @@ def redact_with_idempotency(
 
         jlog(event="redact_ok",
              correlation_id=correlation_id, idempotency_key=idempotency_key,
-             text_len=len(req.text), entities=summary.entities, total=summary.total)
+             text_len=len(text), entities=summary.entities, total=summary.total)
         return resp
 
     except RetryableError:
