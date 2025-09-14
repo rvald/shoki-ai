@@ -18,7 +18,6 @@ IMAGE_PATH_DEPLOY := $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO_NAME)/$(IMAGE
 
 USE_CLOUD_TRACE ?=true
 ENVIRONMENT ?=prod
-SERVICE_NAME ?=orchestrator-service
 
 
 # Build the container image and push to Artifact Registry
@@ -41,10 +40,9 @@ deploy:
 	  --set-env-vars="GOOGLE_CLOUD_LOCATION=$(REGION)" \
 	  --set-env-vars="GOOGLE_CLOUD_PROJECT=$(PROJECT_ID)" \
 	  --set-env-vars="GOOGLE_PROJECT_ID=$(PROJECT_ID)" \
-	  --set-env-vars="AGENTS_SERVICE_URL=$(AGENTS_SERVICE_URL)" \
 	  --set-env-vars="USE_CLOUD_TRACE=$(USE_CLOUD_TRACE)" \
 	  --set-env-vars="ENVIRONMENT=$(ENVIRONMENT)" \
-	  --set-env-vars="SERVICE_NAME=$(SERVICE_NAME)" \
+	  --set-env-vars="PROJECT_ID=$(PROJECT_ID),FIRESTORE_COLLECTION=runs,SERVICE_NAME=$(SERVICE_NAME),ORCH_TIMEOUT_S=120,ORCH_MAX_RETRIES=2,ORCH_BACKOFF_BASE_MS=200,ORCH_BACKOFF_CAP_MS=3000,ORCH_CONCURRENCY=64,ORCH_RETRY_BUDGET_S=6.0,REQUIRE_PUBSUB_AUTH=false,PUBSUB_PUSH_AUDIENCE=https://orchestrator-service-772943814292.us-central1.run.app/events/pubsub,TRANSCRIBE_REQUESTED_TOPIC=transcribe-requested,TRANSCRIBE_COMPLETED_TOPIC=transcribe-completed,REDACT_REQUESTED_TOPIC=redact-requested,REDACT_COMPLETED_TOPIC=redact-completed,AUDIT_REQUESTED_TOPIC=audit-requested,AUDIT_COMPLETED_TOPIC=audit-completed,SOAP_REQUESTED_TOPIC=soap-requested,SOAP_COMPLETED_TOPIC=soap-completed,IDEM_TTL_DAYS=14,INCLUDE_SESSION_IN_IDEM=true"
 	  --project=$(PROJECT_ID) \
 	  --min-instances=0
 

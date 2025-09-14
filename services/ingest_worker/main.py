@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, stop_after_delay, wait_random_exponential
 
-from anyio import to_thread, run
+from anyio import to_thread
 import httpx
 from fastapi import FastAPI, Request, HTTPException, Response
 from google.cloud import firestore

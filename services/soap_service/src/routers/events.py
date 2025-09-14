@@ -2,7 +2,7 @@ import base64
 import json
 from typing import Any, Dict, Optional
 
-from anyio import to_thread, run
+from anyio import to_thread
 import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from google.api_core import exceptions as gax_exceptions
@@ -19,13 +19,10 @@ from tenacity import (
 
 from ..exceptions import PermanentError, RetryableError
 from ..logging import jlog
-from ..schemas import RedactRequest
+from ..schemas import SoapNoteRequest
 from ..config import settings
-from ..storage import artifact_blob_path
+from ..storage import artifact_blob_path, download_blob
 
-# --------------------
-# Configuration
-# --------------------
 router = APIRouter()
 
 # Lazy GCP clients
@@ -42,8 +39,8 @@ def _ensure_pubsub():
             enable_message_ordering=settings.pubsub_enable_ordering
         )
         _publisher = pubsub_v1.PublisherClient(publisher_options=publisher_options)
-        _topics["redact_completed"] = _publisher.topic_path(
-            settings.project_id, settings.redact_completed_topic
+        _topics["soap_completed"] = _publisher.topic_path(
+            settings.project_id, settings.soap_completed_topic
         )
 
 def _ensure_tasks():
@@ -68,7 +65,7 @@ def _decode_pubsub_envelope(envelope: Dict[str, Any]) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Invalid base64/json: {e}")
 
 async def _verify_pubsub_auth(request: Request) -> None:
-    if not settings.pubsub_require_auth:
+    if not settings.require_pubsub_auth:
         return
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -98,25 +95,22 @@ RETRYABLE_PUBSUB_EXC = (
     gax_exceptions.Cancelled,
 )
 
-# --------------------
-# Clients
-# --------------------
 async def _publish_completed(event: Dict[str, Any], ordering_key: str) -> None:
     _ensure_pubsub()
     if _publisher is None:
         raise RuntimeError("Pub/Sub is disabled or not configured")
 
-    topic_path = _topics["redact_completed"]
+    topic_path = _topics["soap_completed"]
     data = json.dumps(event, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     attrs = {
         "event_type": event.get("event_type", ""),
         "run_id": event.get("run_id", ""),
-        "step": event.get("step", "redact"),
+        "step": event.get("step", "soap"),
     }
 
     jlog(
         event="publish_event",
-        topic="redact_completed",
+        topic="soap_completed",
         ordering_key=ordering_key,
         size=len(data),
         attrs=attrs,
@@ -142,7 +136,7 @@ async def _publish_completed(event: Dict[str, Any], ordering_key: str) -> None:
             attempt=rs.attempt_number,
             wait_s=getattr(getattr(rs, "next_action", None), "sleep", None),
             error=str(rs.outcome.exception()) if rs.outcome and rs.outcome.failed else None,
-            topic="redact_completed",
+            topic="soap_completed",
             ordering_key=ordering_key,
         ),
     ):
@@ -160,7 +154,7 @@ async def _publish_completed(event: Dict[str, Any], ordering_key: str) -> None:
 
 def _enqueue_task(task_payload: Dict[str, Any]) -> None:
     """
-    Enqueue a Cloud Task to POST /tasks/redact with JSON body.
+    Enqueue a Cloud Task to POST /tasks/soap with JSON body.
     Deterministic task name for idempotency (per run_id).
     """
     _ensure_tasks()
@@ -170,7 +164,7 @@ def _enqueue_task(task_payload: Dict[str, Any]) -> None:
         )
 
     parent = _tasks_client.queue_path(settings.project_id, settings.task_queue_location, settings.task_queue_name)
-    url = settings.tasks_service_url
+    url = settings.tasks_service_url.rstrip("/") + "/tasks/soap"
     body = json.dumps(task_payload).encode("utf-8")
 
     http_request: Dict[str, Any] = {
@@ -186,8 +180,7 @@ def _enqueue_task(task_payload: Dict[str, Any]) -> None:
             **({"audience": settings.tasks_audience} if settings.tasks_audience else {}),
         }
 
-    # Deterministic task name for dedup
-    task_name = f"redact-{task_payload['run_id']}"
+    task_name = f"soap-{task_payload['run_id']}"
     task = {
         "name": _tasks_client.task_path(
             settings.project_id, settings.task_queue_location, settings.task_queue_name, task_name
@@ -204,7 +197,7 @@ def _enqueue_task(task_payload: Dict[str, Any]) -> None:
 @router.post("/events/pubsub")
 async def pubsub_push(request: Request, background: BackgroundTasks) -> Dict[str, Any]:
     """
-    Pub/Sub push handler. Expects event_type=redact.requested.
+    Pub/Sub push handler. Expects event_type=soap.requested.
     Ack fast: enqueue a Cloud Task and return 2xx.
     """
     await _verify_pubsub_auth(request)
@@ -219,13 +212,13 @@ async def pubsub_push(request: Request, background: BackgroundTasks) -> Dict[str
         delivery_attempt=delivery_attempt,
     )
 
-    if event_type != "redact.requested":
+    if event_type != "soap.requested":
         return {}
 
     run_id = payload.get("run_id")
     input_obj = payload.get("input", {}) or {}
-    artifacts = payload.get("artifacts", {}) or {}
     corr = payload.get("correlation_id") or ""
+    artifacts = payload.get("artifacts", {}) or {}
 
     if not run_id:
         raise HTTPException(status_code=400, detail="missing run_id")
@@ -245,24 +238,24 @@ async def pubsub_push(request: Request, background: BackgroundTasks) -> Dict[str
             _enqueue_task(task_payload)
         else:
             # Dev fallback: fire-and-forget (not for prod)
-            background.add_task(_process_redaction_task, request, task_payload)
+            background.add_task(_process_soap_task, request, task_payload)
     except Exception as e:
         jlog(event="enqueue_failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"enqueue failed: {e}") from e
 
     return {}
 
-@router.post("/tasks/redact")
-async def tasks_redact(request: Request, task_body: Dict[str, Any]) -> Dict[str, Any]:
+@router.post("/tasks/soap")
+async def tasks_soap(request: Request, task_body: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Cloud Task worker. Does redaction and publishes *.completed.
+    Cloud Task worker. Generates SOAP note and publishes *.completed.
     PermanentError -> 422 (stop retries), RetryableError/unknown -> 503 (retry).
     """
     retry_count = request.headers.get("X-Cloud-Tasks-TaskRetryCount")
     jlog(event="task_received", retry_count=retry_count, body_keys=list(task_body.keys()))
 
     try:
-        await _process_redaction_task(request, task_body)
+        await _process_soap_task(request, task_body)
         return {"ok": True}
     except PermanentError as e:
         jlog(event="task_failed_permanent", error=str(e))
@@ -274,27 +267,35 @@ async def tasks_redact(request: Request, task_body: Dict[str, Any]) -> Dict[str,
         jlog(event="task_failed_unexpected", error=str(e))
         raise HTTPException(status_code=503, detail="unexpected error") from e
 
-async def _process_redaction_task(request: Request, task_body: Dict[str, Any]) -> None:
+async def _process_soap_task(request: Request, task_body: Dict[str, Any]) -> None:
     """
-    Orchestrates loading the transcription artifact, redacting, and publishing the result.
+    Load redacted text from artifact bucket (by idem_key=run_id),
+    generate SOAP note via LLM with idempotency, and publish soap.completed.
     """
     run_id = task_body["run_id"]
     input_obj = task_body.get("input") or {}
-    corr = task_body.get("correlation_id")
+    corr = task_body.get("correlation_id") or ""
+    artifacts = task_body.get("artifacts") or {}
 
     src_bucket = input_obj.get("bucket")
     name = input_obj.get("name")
     generation = input_obj.get("generation")
-    # If upstream provided a transcript_uri, we could parse it. Otherwise use configured artifact bucket.
 
-    # Build RedactRequest: read by idempotency key (shared across steps) from the artifact bucket
-    rreq = RedactRequest(bucket=src_bucket, idem_key=run_id) # type: ignore
+    # Load redacted text from artifact bucket. We expect Privacy to have written it keyed by run_id.
+    redacted_obj = await to_thread.run_sync(download_blob, "shoki-ai-privacy-service", run_id)
+    if not redacted_obj:
+        raise PermanentError(f"Missing redacted artifact for run_id={run_id} in bucket={settings.artifact_bucket}")
 
-    # Step-level idempotency is the run_id
+    redacted_text = redacted_obj.get("text", "")
+    if not redacted_text:
+        raise PermanentError("Empty redacted text")
+
+    from ..schemas import SoapNoteRequest
+    sreq = SoapNoteRequest(text=redacted_text, language=input_obj.get("language_hint"))
     idem_key = run_id
 
     jlog(
-        event="redact_task_start",
+        event="soap_task_start",
         run_id=run_id,
         correlation_id=corr,
         bucket=src_bucket,
@@ -303,36 +304,35 @@ async def _process_redaction_task(request: Request, task_body: Dict[str, Any]) -
         idempotency_key=idem_key,
     )
 
-    # Execute redaction in a worker thread
-    from ..service import redact_with_idempotency as _svc_redact
-    resp = await to_thread.run_sync(_svc_redact, rreq, corr, idem_key)
+    # Execute SOAP generation in a worker thread
+    from ..service import generate_soap_with_idempotency as _svc_soap
+    resp = await to_thread.run_sync(_svc_soap, sreq, corr, idem_key)
 
-    # Build artifacts for downstream. Provide GCS URI and structured response.
-    redacted_uri = artifact_blob_path(idem_key)  # depends on your storage implementation
+    # Build artifacts for downstream and emit event
+    soap_uri = artifact_blob_path(idem_key)
     out_artifacts: Dict[str, Any] = {
         "cache_key": idem_key,
-        "redaction": resp.model_dump(),
-        "redacted_uri": redacted_uri,
+        "soap_note": resp.model_dump(),
+        "soap_uri": soap_uri,
     }
 
     event = {
         "version": "1",
-        "event_type": "redact.completed",
+        "event_type": "soap.completed",
         "run_id": run_id,
-        "step": "redact",
-        "input": {"bucket": settings.artifact_bucket, "name": name, "generation": generation},
+        "step": "soap",
+        "input": {"bucket": src_bucket, "name": name, "generation": generation},
         "artifacts": out_artifacts,
         "correlation_id": corr or "",
         "ts": _utcnow(),
     }
 
-    jlog(event="redact_completed_emit", run_id=run_id, correlation_id=corr, artifacts=list(out_artifacts.keys()))
+    jlog(event="soap_completed_emit", run_id=run_id, correlation_id=corr, artifacts=list(out_artifacts.keys()))
 
     # Publish to Pub/Sub or to orchestrator in local mode
     if settings.pubsub_enabled:
         await _publish_completed(event, ordering_key=run_id)
     else:
-        # local dev: post envelope to orchestrator
         url = settings.orchestrator_pubsub_url
         if not url:
             jlog(event="local_publish_skipped", reason="no_url")

@@ -6,7 +6,7 @@ set -euo pipefail
 # ==============================
 : "${WORKER_URL:=http://localhost:8087/pubsub/push}"    # e.g., https://ingest-worker-xyz-uc.a.run.app/pubsub/push
 : "${BUCKET:=shoki-ai-audio}"
-: "${OBJECT:=recording.caf}"
+: "${OBJECT:=recording.wav}"
 : "${SESSION_ID:=sess-030}"
 : "${USER_ID:=user-152}"
 : "${USE_ID_TOKEN:=false}"   # set true when hitting Cloud Run with auth

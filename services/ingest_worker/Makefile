@@ -11,7 +11,6 @@ PROJECT_ID ?= shoki-api
 REPO_NAME ?= compliance-repo
 SERVICE_NAME ?= ingest-service
 
-ORCHESTRATOR_URL ?= "https://orchestrator-service-772943814292.us-central1.run.app"
 USE_CLOUD_TRACE ?=true
 ENVIRONMENT ?=prod
 SERVICE_NAME ?=ingest-service
@@ -41,10 +40,10 @@ deploy:
 	  --set-env-vars="GOOGLE_CLOUD_LOCATION=$(REGION)" \
 	  --set-env-vars="GOOGLE_CLOUD_PROJECT=$(PROJECT_ID)" \
 	  --set-env-vars="GOOGLE_PROJECT_ID=$(PROJECT_ID)" \
-	  --set-env-vars="ORCHESTRATOR_URL=$(ORCHESTRATOR_URL)" \
 	  --set-env-vars="USE_CLOUD_TRACE=$(USE_CLOUD_TRACE)" \
 	  --set-env-vars="ENVIRONMENT=$(ENVIRONMENT)" \
 	  --set-env-vars="SERVICE_NAME=$(SERVICE_NAME)" \
+	  --set-env-vars="PROJECT_ID=${PROJECT_ID},FIRESTORE_COLLECTION=ingestions,ORCHESTRATOR_URL=https://orchestrator-service-772943814292.us-central1.run.app,ORCH_TIMEOUT_S=120,ORCH_MAX_RETRIES=2,ORCH_BACKOFF_BASE_MS=200,ORCH_BACKOFF_CAP_MS=3000,ORCH_RETRY_BUDGET_S=6.0,ORCH_CONCURRENCY=64,REQUIRE_PUBSUB_AUTH=false,PUBSUB_PUSH_AUDIENCE=https://ingest-service-772943814292.us-central1.run.app/pubsub/push,IDEM_TTL_DAYS=14,INCLUDE_SESSION_IN_IDEM=true" \
 	  --project=$(PROJECT_ID) \
 	  --min-instances=0
 

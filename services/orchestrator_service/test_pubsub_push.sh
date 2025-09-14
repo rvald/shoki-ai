@@ -4,12 +4,14 @@ set -euo pipefail
 # ==============================
 # Config (override via env vars)
 # ==============================
-: "${ORCH_BASE:=http://localhost:8089}"     # e.g., http://localhost:8080 when running uvicorn main:app --reload
+: "${ORCH_BASE:=https://55adbca5a727.ngrok-free.app}"     # e.g., http://localhost:8080 when running uvicorn main:app --reload
 : "${RUNS_URL:=${ORCH_BASE}/runs}"
 : "${PUBSUB_URL:=${ORCH_BASE}/events/pubsub}"
 
-: "${BUCKET:=shoki-ai-privacy-service}"
-: "${OBJECT:=recording.caf}"
+: "${AUDIO_BUCKET:=shoki-ai-audio}"
+: "${PRIVACY_BUCKET:=shoki-ai-privacy-service}"
+: "${TRANSCRIBE_BUCKET:=shoki-ai-transcribe-service}"
+: "${OBJECT:=recording.wav}"
 : "${SESSION_ID:=sess-local-001}"
 : "${USER_ID:=user-local-001}"
 : "${GENERATION:=}"                         # default: auto-generate
@@ -76,7 +78,7 @@ make_transcribe_completed_event() {
 {
   "version":"1",
   "event_type":"transcribe.completed",
-  "run_id":"${run_id}",
+  "run_id":"89d421044d0230fe65262d789345f897d98048af5a975811d741ee5a6cda027e",
   "step":"transcribe",
   "input":{"bucket":"${bucket}","name":"${name}","generation":"${gen}","metadata":{"session_id":"${sess}","user_id":"${USER_ID}"}},
   "artifacts":{"transcript_uri":"gs://${bucket}/${name}.${gen}/transcript.json"},
@@ -91,10 +93,10 @@ make_redact_completed_event() {
 {
   "version":"1",
   "event_type":"redact.completed",
-  "run_id":"df86a0ceb9892e5bb58e2d5308dea6c1994589c13bba06ecc4c7778c9266313b",
-  "step":"react",
+  "run_id":"76ad6af4817e8a2a38f1fe9fa843dc6657d9b0c9c83ec255a71b32f1075cafde",
+  "step":"redact",
   "input":{"bucket":"${bucket}","name":"${name}","generation":"${gen}","metadata":{"session_id":"${sess}","user_id":"${USER_ID}"}},
-  "artifacts":{"react_uri":"gs://${bucket}/${name}.${gen}/react.json"},
+  "artifacts":{"redact_uri":"gs://${bucket}/${name}.${gen}/redacted.json"},
   "ts":"$(rfc3339_now)"
 }
 EOF
@@ -106,7 +108,7 @@ main() {
     start)
       # Start a new run (or return existing if duplicate)
       local body
-      body="$(make_runs_body "${BUCKET}" "${OBJECT}" "${gen}" "${CORRELATION_ID}" "${SESSION_ID}")"
+      body="$(make_runs_body "${AUDIO_BUCKET}" "${OBJECT}" "${gen}" "${CORRELATION_ID}" "${SESSION_ID}")"
       post_json "${RUNS_URL}" "${body}"
       echo "Tip: to progress the workflow locally, run:"
       echo "  $0 transcribe-completed"
@@ -116,9 +118,9 @@ main() {
     transcribe-completed)
       # Compute run_id exactly as orchestrator does, then simulate Pub/Sub push for transcribe.completed
       local run_id
-      run_id="$(compute_run_id "${BUCKET}" "${OBJECT}" "${gen}" "${SESSION_ID}")"
+      run_id="$(compute_run_id "${TRANSCRIBE_BUCKET}" "${OBJECT}" "${gen}" "${SESSION_ID}")"
       local evt
-      evt="$(make_transcribe_completed_event "${run_id}" "${BUCKET}" "${OBJECT}" "${gen}" "${SESSION_ID}")"
+      evt="$(make_transcribe_completed_event "${run_id}" "${TRANSCRIBE_BUCKET}" "${OBJECT}" "${gen}" "${SESSION_ID}")"
       local env
       env="$(make_pubsub_envelope "m-transcribe-${gen}" "${evt}")"
       post_json "${PUBSUB_URL}" "${env}"
@@ -127,9 +129,9 @@ main() {
     redact-completed)
       # Simulate Pub/Sub push for react.completed
       local run_id
-      run_id="$(compute_run_id "${BUCKET}" "${OBJECT}" "${gen}" "${SESSION_ID}")"
+      run_id="$(compute_run_id "${PRIVACY_BUCKET}" "${OBJECT}" "${gen}" "${SESSION_ID}")"
       local evt
-      evt="$(make_redact_completed_event "${run_id}" "${BUCKET}" "${OBJECT}" "${gen}" "${SESSION_ID}")"
+      evt="$(make_redact_completed_event "${run_id}" "${PRIVACY_BUCKET}" "${OBJECT}" "${gen}" "${SESSION_ID}")"
       local env
       env="$(make_pubsub_envelope "m-react-${gen}" "${evt}")"
       post_json "${PUBSUB_URL}" "${env}"

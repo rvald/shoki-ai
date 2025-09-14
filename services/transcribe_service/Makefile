@@ -17,8 +17,6 @@ IMAGE_PATH_DEPLOY := $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO_NAME)/$(IMAGE
 
 USE_CLOUD_TRACE ?=true
 ENVIRONMENT ?=prod
-SERVICE_NAME ?=transcribe-service
-TRANSCRIBE_ARTIFACT_BUCKET ?= "shoki-ai-transcribe-service"
 
 # Build the container image and push to Artifact Registry
 build:
@@ -37,14 +35,11 @@ deploy:
 	  --allow-unauthenticated \
 	  --set-env-vars="APP_HOST=0.0.0.0" \
 	  --set-env-vars="APP_PORT=8080" \
-	  --set-env-vars="GOOGLE_CLOUD_LOCATION=$(REGION)" \
 	  --set-env-vars="GOOGLE_CLOUD_PROJECT=$(PROJECT_ID)" \
-	  --set-env-vars="GOOGLE_CLOUD_STORAGE_BUCKET=$(GOOGLE_CLOUD_STORAGE_BUCKET)" \
 	  --set-env-vars="GOOGLE_PROJECT_ID=$(PROJECT_ID)" \
 	  --set-env-vars="USE_CLOUD_TRACE=$(USE_CLOUD_TRACE)" \
 	  --set-env-vars="ENVIRONMENT=$(ENVIRONMENT)" \
-	  --set-env-vars="SERVICE_NAME=$(SERVICE_NAME)" \
-	  --set-env-vars="TRANSCRIBE_ARTIFACT_BUCKET=$(TRANSCRIBE_ARTIFACT_BUCKET)" \
+	  --set-env-vars="PROJECT_ID=$(PROJECT_ID),SERVICE_ACCOUNT_NAME=${SERVICE_ACCOUNT_NAME},GOOGLE_CLOUD_LOCATION=$(REGION),SERVICE_NAME=$(SERVICE_NAME),ARTIFACT_BUCKET=shoki-ai-transcribe-service,GOOGLE_CLOUD_STORAGE_BUCKET=shoki-ai-audio,PUBSUB_ENABLED=true,TRANSCRIBE_COMPLETED_TOPIC=transcribe-completed,PUBSUB_PUBLISH_TIMEOUT_S=30,PUBSUB_MAX_RETRIES=2,PUBSUB_RETRY_BUDGET_S=6.0,PUBSUB_BACKOFF_BASE_MS=200,PUBSUB_BACKOFF_CAP_MS=3000,PUBSUB_REQUIRE_AUTH=true,PUBSUB_PUSH_AUDIENCE=https://transcribe-service-772943814292.us-central1.run.app,TASK_QUEUE_NAME=scribe-jobs,TASK_QUEUE_LOCATION=us-central1,TASKS_SERVICE_URL=https://transcribe-service-772943814292.us-central1.run.app/tasks/transcribe,TASKS_AUDIENCE=https://transcribe-service-772943814292.us-central1.run.app,ORCHESTRATOR_PUBSUB_URL=,TASKS_CALLER_SA=${SERVICE_ACCOUNT_NAME}" \
 	  --project=$(PROJECT_ID) \
 	  --min-instances=0
 

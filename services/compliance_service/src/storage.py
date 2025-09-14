@@ -2,9 +2,10 @@ import os, json
 from typing import Optional
 from google.cloud import storage
 from .schemas import AuditResponse
+from .config import settings
 
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
-ARTIFACT_BUCKET = os.getenv("COMPLIANCE_ARTIFACT_BUCKET") or "shoki-ai-compliance-service"
+PROJECT_ID = settings.project_id
+ARTIFACT_BUCKET = settings.artifact_bucket
 _storage = storage.Client(project=PROJECT_ID) if PROJECT_ID else storage.Client()
 
 def artifact_blob_path(idempotency_key: str) -> str:

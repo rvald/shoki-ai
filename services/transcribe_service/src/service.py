@@ -1,52 +1,40 @@
-import os, time, hashlib
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any
-
-from .schemas import TranscriptionRequest, TranscriptionResponse, Transcription, Segment
-from .exceptions import RetryableError, PermanentError
-from .logging import jlog
-from .storage import load_artifact, save_artifact, download_blob_to_tmp
-
+import hashlib
 import logging
+import os
+import time
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from .exceptions import PermanentError, RetryableError
+from .logging import jlog
+from .schemas import Segment, Transcription, TranscriptionRequest, TranscriptionResponse
+from .storage import download_blob_to_tmp, load_artifact, save_artifact
+
 retry_logger = logging.getLogger("tenacity")
 
-GOOGLE_CLOUD_STORAGE_BUCKET = os.environ.get("GOOGLE_CLOUD_STORAGE_BUCKET")
-GOOGLE_PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
-WHISPER_MODEL_SIZE  = "small" 
-
-_SIM_ATTEMPTS: dict[str, int] = {}
-
-# Global Whisper model (load once)
-import whisper
+WHISPER_MODEL_SIZE = "small"
 _MODEL = None
 
 def load_model_once():
     global _MODEL
     if _MODEL is None:
+        import whisper
         _MODEL = whisper.load_model(WHISPER_MODEL_SIZE)
     return _MODEL
 
-def hash_preview(
-    s: str
-) -> str:
+def hash_preview(s: str) -> str:
     return f"sha256={hashlib.sha256(s.encode()).hexdigest()[:12]},len={len(s)}"
 
-
 def run_transcribe_step(
-    local_path: str,
+    local_path: str, 
     language_hint: Optional[str]
 ) -> Dict[str, Any]:
-
-    # Actual backend
     return transcribe_backend(local_path, language_hint)
-
 
 def transcribe_backend(
     file_path: str, 
     language_hint: Optional[str]
 ) -> Dict[str, Any]:
-    
-    """Runs Whisper; classify expected errors."""
     try:
         model = load_model_once()
         result = model.transcribe(
@@ -55,10 +43,9 @@ def transcribe_backend(
             task="transcribe",
             verbose=False,
         )
-        segments = [{"start": s["start"], "end": s["end"], "text": s["text"].strip()} # type: ignore
-                    for s in result.get("segments", [])]
+        segments = [{"start": s["start"], "end": s["end"], "text": s["text"].strip()} for s in result.get("segments", [])]  # type: ignore
         return {
-            "text": result.get("text", "").strip(), # type: ignore
+            "text": result.get("text", "").strip(),  # type: ignore
             "language": result.get("language"),
             "segments": segments,
             "duration": result.get("duration", 0),
@@ -89,11 +76,10 @@ def build_response(
         audio_name=audio_name,
     )
 
-
 def derive_idempotency_key(
-    x_idempotency_key: Optional[str],
-    bucket: Optional[str],
-    audio_file_name: str,
+    x_idempotency_key: Optional[str], 
+    bucket: Optional[str], 
+    audio_file_name: str, 
     generation: Optional[str]
 ) -> Optional[str]:
     if x_idempotency_key:
@@ -101,18 +87,15 @@ def derive_idempotency_key(
     raw = f"{bucket or ''}/{audio_file_name}@{generation or ''}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
-
 def transcribe_with_idempotency(
-    req: TranscriptionRequest,
-    correlation_id: Optional[str],
+    req: TranscriptionRequest, 
+    correlation_id: Optional[str], 
     idempotency_key: Optional[str]
 ) -> TranscriptionResponse:
     # Step-level cache
     cached = load_artifact(idempotency_key)
     if cached:
-        jlog(event="transcribe_cache_hit",
-             correlation_id=correlation_id, idempotency_key=idempotency_key,
-             audio=hash_preview(req.name))
+        jlog(event="transcribe_cache_hit", correlation_id=correlation_id, idempotency_key=idempotency_key, audio=hash_preview(req.name))
         return cached
 
     # Download audio
@@ -144,9 +127,12 @@ def transcribe_with_idempotency(
     # Persist artifact for reuse
     save_artifact(idempotency_key, resp)
 
-    jlog(event="transcribe_ok",
-         correlation_id=correlation_id,
-         idempotency_key=idempotency_key,
-         audio=hash_preview(req.name),
-         download_ms=dl_ms, transcribe_ms=tx_ms)
+    jlog(
+        event="transcribe_ok",
+        correlation_id=correlation_id,
+        idempotency_key=idempotency_key,
+        audio=hash_preview(req.name),
+        download_ms=dl_ms,
+        transcribe_ms=tx_ms,
+    )
     return resp
