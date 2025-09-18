@@ -6,6 +6,7 @@ input = "Hi <PERSON>, it’s good to see you again. How have you been feeling si
 output = """{"hippa_compliant" : true}"""
 expected_output = """{"hippa_compliant" : true}"""
 
+# Define the evaluation metric
 correctness_metric = GEval(
     name="Correctness",
     criteria="Determine if the 'actual output' is correct based on the 'expected output'.",
@@ -13,6 +14,7 @@ correctness_metric = GEval(
     threshold=0.5
 )
 
+# Create a test case
 test_case = LLMTestCase(
     input=input,
     # Replace this with the actual output from your LLM application
@@ -20,4 +22,5 @@ test_case = LLMTestCase(
     expected_output=expected_output
 )
 
+# Run the evaluation
 evaluate([test_case], [correctness_metric])
