@@ -311,9 +311,9 @@ async def _process_audit_task(request: Request, task_body: Dict[str, Any]) -> No
     audit_uri = artifact_blob_path(idem_key)
     out_artifacts: Dict[str, Any] = {
         "cache_key": idem_key,
-        "audit": resp.model_dump(),
+        #"audit": resp.model_dump(),
         "audit_uri": audit_uri,
-        "hipaa_pass": resp.hipaa_compliant,
+        #"hipaa_pass": resp.hipaa_compliant,
     }
 
     event = {

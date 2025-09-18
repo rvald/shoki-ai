@@ -10,10 +10,12 @@ from opentelemetry import trace
 
 from .exceptions import PermanentError, RetryableError
 from .logging import jlog
-from .prompt import system_prompt
+
 from .schemas import AuditRequest, AuditResponse
 from .config import settings
 from .storage import load_artifact, save_artifact
+
+from .sequential_agent import SequentialAgent
 
 tracer = trace.get_tracer("compliance.audit")
 retry_logger = logging.getLogger("tenacity")
@@ -43,7 +45,7 @@ def _call_llm_with_guardrails(redacted_text: str, correlation_id: Optional[str])
         completion = client.chat.completions.create(
             model=AUDIT_MODEL,
             messages=[
-                { "role": "system", "content": system_prompt},
+                { "role": "system", "content": "system_prompt"},
                 { "role": "user", "content": redacted_text}
             ],
             temperature=0.4,
@@ -105,7 +107,7 @@ def generate_audit_with_idempotency(
     req: AuditRequest,
     correlation_id: Optional[str],
     idempotency_key: Optional[str],
-) -> AuditResponse:
+) -> str:
     if not req.transcript or not req.transcript.strip():
         raise PermanentError("Empty transcript")
 
@@ -117,7 +119,7 @@ def generate_audit_with_idempotency(
             idempotency_key=idempotency_key,
             transcript_hash=_hash_preview(req.transcript),
         )
-        return cached
+        return "cached"
 
     with tracer.start_as_current_span("AuditGeneration") as span:
         span.set_attribute("operation", "audit_generation")
@@ -125,16 +127,21 @@ def generate_audit_with_idempotency(
         span.set_attribute("transcript_preview", _hash_preview(req.transcript))
         span.set_attribute("correlation_id", correlation_id or "")
 
-        data = _call_llm_with_guardrails(req.transcript, correlation_id)
-        resp = AuditResponse(**data)
-        save_artifact(idempotency_key, resp)
+        #data = _call_llm_with_guardrails(req.transcript, correlation_id)
+        sequential_agent = SequentialAgent()
+        response = sequential_agent.process_transcript(req.transcript)
 
-        jlog(
-            event="audit_ok",
-            correlation_id=correlation_id,
-            idempotency_key=idempotency_key,
-            hipaa_compliant=resp.hipaa_compliant,
-            fails=len(resp.fail_identifiers),
-        )
-        return resp
+        print(response.model_dump())
+
+        #resp = AuditResponse(**data)
+        #save_artifact(idempotency_key, resp)
+
+        # jlog(
+        #     event="audit_ok",
+        #     correlation_id=correlation_id,
+        #     idempotency_key=idempotency_key,
+        #     hipaa_compliant=resp.hipaa_compliant,
+        #     fails=len(resp.fail_identifiers),
+        # )
+        return "resp"
 

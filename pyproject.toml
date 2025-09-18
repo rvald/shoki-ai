@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "baml-py>=0.206.1",
+    "deepeval>=3.5.2",
     "fastapi[standard]>=0.116.1",
     "google-cloud-aiplatform[adk,agent-engines]>=1.108.0",
     "google-cloud-firestore>=2.21.0",

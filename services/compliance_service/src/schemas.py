@@ -1,5 +1,5 @@
-from typing import List
-from pydantic import BaseModel, Field
+from typing import List, Literal
+from pydantic import BaseModel, Field, ConfigDict
 
 class FailIdentifier(BaseModel):
     type: str = Field(..., description="HIPAA identifier category")
@@ -15,3 +15,37 @@ class AuditResponse(BaseModel):
     fail_identifiers: List[FailIdentifier] = []
     comments: str = ""
     version: str = "v1"
+
+class IssueFound(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    # Use alias to preserve the exact field name "type" in JSON
+    type_: str = Field(..., alias="type", description="HIPAA identifier type (e.g., name, address, date, phone)")
+    text: str = Field(..., description="Exact offending text as it appears in the transcript")
+    position: str = Field(..., description="Character indices (start-end) or a clear descriptive location")
+    rule: str = Field(..., description="Specific Safe Harbor rule violated")
+    source: Literal["audit", "rescanned", "both"] = Field(..., description="Origin of detection")
+    confidence: Literal["high", "medium", "low"] = Field(..., description="Confidence in the detection")
+
+
+class RemediationStep(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    before: str = Field(..., description="Original snippet containing PHI")
+    after: str = Field(..., description="Redacted or generalized replacement")
+    # Use alias to preserve the exact field name "type" in JSON
+    type_: str = Field(..., alias="type", description="HIPAA identifier type for the repaired item")
+    position: str = Field(..., description="Character indices (start-end) or a clear descriptive location")
+    rule: str = Field(..., description="Specific Safe Harbor rule applied")
+
+
+class HipaaRemediationResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    compliance_before: Literal["true", "false", "unknown"] = Field(..., description="Compliance status prior to remediation")
+    audit_summary: str = Field(..., description="One-paragraph summary of the audit and implications")
+    issues_found: List[IssueFound] = Field(default_factory=list, description="Merged/deduplicated list of detected PHI issues")
+    remediation_steps: List[RemediationStep] = Field(default_factory=list, description="List of repairs applied to the transcript")
+    transcript_sanitized: str = Field(..., description="Final HIPAA-compliant transcript text")
+    compliance_after: bool = Field(..., description="True if sanitized transcript is HIPAA-compliant")
+    comments: str = Field(..., description="Brief notes on trade-offs, residual risk, and SOAP guidance")

@@ -38,5 +38,5 @@ jobs:
         working-directory: services/compliance_service
         run: |
             source .venv/bin/activate
-            uv run pytest --import-mode=importlib
+            uv run deepeval test run ./tests/test_audit.py
             

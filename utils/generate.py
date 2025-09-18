@@ -34,7 +34,7 @@ def generate_response(
             temperature=temperature,
         )
         elapsed = time.time() - start_time
-        prediction = completion.choices[0].message.content.strip()
+        prediction = completion.choices[0].message.content.strip() # type: ignore
 
         # Try to extract token usage data
         usage = getattr(completion, "usage", None)
